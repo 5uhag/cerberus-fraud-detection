@@ -41,6 +41,8 @@ body {
   margin: 42px auto 64px;
   display: grid;
   gap: 22px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .hero h1 {
@@ -154,6 +156,8 @@ body {
   padding: 20px;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .upload-box {
@@ -316,6 +320,7 @@ body {
   overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: 12px;
+  max-width: 100%;
 }
 
 table {
