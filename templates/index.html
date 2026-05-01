@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <div class="background-glow"></div>
@@ -125,6 +126,35 @@
         <p>Fraud Rate</p>
         <h3 id="fraudRate">0%</h3>
       </article>
+    </section>
+
+    <section id="analyticsSection" class="panel hidden">
+      <div class="table-header">
+        <h2>Analytics</h2>
+        <p>Visual breakdown of the uploaded transactions</p>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h4>Fraud vs Legit</h4>
+          <canvas id="chartDonut"></canvas>
+        </div>
+        <div class="chart-card">
+          <h4>Amount Distribution</h4>
+          <canvas id="chartAmount"></canvas>
+        </div>
+        <div class="chart-card">
+          <h4>Fraud Probability Distribution</h4>
+          <canvas id="chartProb"></canvas>
+        </div>
+        <div class="chart-card">
+          <h4>Amount over Time</h4>
+          <canvas id="chartScatter"></canvas>
+        </div>
+      </div>
+      <div id="topRisksWrap">
+        <h4 class="top-risks-title">Top 5 Highest Risk Transactions</h4>
+        <table id="topRisksTable"></table>
+      </div>
     </section>
 
     <section id="tableSection" class="panel hidden">

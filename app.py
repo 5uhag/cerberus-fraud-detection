@@ -4,6 +4,7 @@ import logging
 import os
 
 import joblib
+import numpy as np
 import pandas as pd
 from flask import Flask, jsonify, render_template, request, send_file
 
@@ -91,6 +92,57 @@ def read_uploaded_csv(uploaded_file):
         return None, "Could not read the CSV file."
 
 
+def compute_analytics(result_df, probabilities, predictions):
+    amounts = result_df["Amount"].values.astype(float)
+
+    bin_edges = [0, 10, 50, 100, 500, 1000, float("inf")]
+    bin_labels = ["$0–10", "$10–50", "$50–100", "$100–500", "$500–1K", "$1K+"]
+    amount_dist = []
+    for i in range(len(bin_edges) - 1):
+        lo, hi = bin_edges[i], bin_edges[i + 1]
+        mask = (amounts >= lo) & (amounts < hi)
+        amount_dist.append({
+            "label": bin_labels[i],
+            "total": int(mask.sum()),
+            "fraud": int((predictions[mask] == 1).sum()),
+        })
+
+    prob_dist = []
+    for i in range(10):
+        lo, hi = i / 10, (i + 1) / 10
+        mask = (probabilities >= lo) & (probabilities < hi) if i < 9 else (probabilities >= lo)
+        prob_dist.append({"label": f"{i * 10}–{(i + 1) * 10}%", "count": int(mask.sum())})
+
+    n = len(result_df)
+    indices = np.sort(np.random.choice(n, min(300, n), replace=False))
+    time_col = result_df["Time"].values if "Time" in result_df.columns else np.arange(n)
+    time_series = [
+        {
+            "time": round(float(time_col[idx]), 2),
+            "amount": round(float(amounts[idx]), 2),
+            "fraud": int(predictions[idx]),
+        }
+        for idx in indices
+    ]
+
+    top_idx = np.argsort(probabilities)[-5:][::-1]
+    top_risks = [
+        {
+            "row": int(idx),
+            "amount": round(float(amounts[idx]), 2),
+            "probability": round(float(probabilities[idx]) * 100, 1),
+        }
+        for idx in top_idx
+    ]
+
+    return {
+        "amount_distribution": amount_dist,
+        "probability_distribution": prob_dist,
+        "time_series": time_series,
+        "top_risks": top_risks,
+    }
+
+
 def run_inference(uploaded_file, threshold=DEFAULT_THRESHOLD):
     if MODEL is None or SCALER is None or FEATURE_ORDER is None:
         return None, None, "Model artifacts not found. Run model.py first.", 500
@@ -125,7 +177,8 @@ def run_inference(uploaded_file, threshold=DEFAULT_THRESHOLD):
         "legit_transactions": total_count - fraud_count,
         "fraud_rate": fraud_rate,
     }
-    return result_df, summary, None, 200
+    analytics = compute_analytics(result_df, probabilities, predictions)
+    return result_df, summary, analytics, None, 200
 
 
 @app.get("/")
@@ -231,7 +284,7 @@ def predict_from_csv():
         return jsonify({"error": error}), 400
 
     logger.info("Prediction request received for %s with threshold=%.2f", uploaded_file.filename, threshold)
-    result_df, summary, error, status_code = run_inference(uploaded_file, threshold)
+    result_df, summary, analytics, error, status_code = run_inference(uploaded_file, threshold)
     if error:
         return jsonify({"error": error}), status_code
 
@@ -244,6 +297,7 @@ def predict_from_csv():
 
     response = {
         "summary": summary,
+        "analytics": analytics,
         "preview": result_df.head(15).to_dict(orient="records"),
     }
     return jsonify(response)
@@ -262,7 +316,7 @@ def download_results():
     if error:
         return jsonify({"error": error}), 400
 
-    result_df, _, error, status_code = run_inference(uploaded_file, threshold)
+    result_df, _, _analytics, error, status_code = run_inference(uploaded_file, threshold)
     if error:
         return jsonify({"error": error}), status_code
 

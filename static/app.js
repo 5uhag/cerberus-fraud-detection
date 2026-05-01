@@ -8,6 +8,7 @@ const tableSection = document.getElementById("tableSection");
 const downloadBtn = document.getElementById("downloadBtn");
 const resultTable = document.getElementById("resultTable");
 const thresholdInput = document.getElementById("threshold");
+const analyticsSection = document.getElementById("analyticsSection");
 const metricsSection = document.getElementById("metricsSection");
 const metricPrecision = document.getElementById("metricPrecision");
 const metricRecall = document.getElementById("metricRecall");
@@ -163,6 +164,7 @@ uploadForm.addEventListener("submit", async (event) => {
     }
 
     updateSummary(payload.summary);
+    renderAnalytics(payload.analytics, payload.summary);
     renderTable(payload.preview);
     downloadBtn.disabled = false;
   } catch {
@@ -235,6 +237,111 @@ if (generateBtn) {
       toggleError("Could not generate sample right now.");
     }
   });
+}
+
+const chartInstances = {};
+
+function destroyChart(id) {
+  if (chartInstances[id]) {
+    chartInstances[id].destroy();
+    delete chartInstances[id];
+  }
+}
+
+function renderAnalytics(analytics, summary) {
+  if (!analyticsSection || !analytics) return;
+  analyticsSection.classList.remove("hidden");
+
+  // 1. Donut — Fraud vs Legit
+  destroyChart("donut");
+  chartInstances["donut"] = new Chart(document.getElementById("chartDonut"), {
+    type: "doughnut",
+    data: {
+      labels: ["Legit", "Fraud"],
+      datasets: [{
+        data: [summary.legit_transactions, summary.fraud_transactions],
+        backgroundColor: ["#1b8f5a", "#cc3d2f"],
+        borderWidth: 2,
+        borderColor: "#fff",
+      }],
+    },
+    options: { plugins: { legend: { position: "bottom" } }, cutout: "62%" },
+  });
+
+  // 2. Bar — Amount distribution
+  destroyChart("amount");
+  chartInstances["amount"] = new Chart(document.getElementById("chartAmount"), {
+    type: "bar",
+    data: {
+      labels: analytics.amount_distribution.map((b) => b.label),
+      datasets: [
+        {
+          label: "Legit",
+          data: analytics.amount_distribution.map((b) => b.total - b.fraud),
+          backgroundColor: "rgba(27,143,90,0.7)",
+        },
+        {
+          label: "Fraud",
+          data: analytics.amount_distribution.map((b) => b.fraud),
+          backgroundColor: "rgba(204,61,47,0.7)",
+        },
+      ],
+    },
+    options: {
+      plugins: { legend: { position: "bottom" } },
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+    },
+  });
+
+  // 3. Bar — Probability distribution
+  destroyChart("prob");
+  chartInstances["prob"] = new Chart(document.getElementById("chartProb"), {
+    type: "bar",
+    data: {
+      labels: analytics.probability_distribution.map((b) => b.label),
+      datasets: [{
+        label: "Transactions",
+        data: analytics.probability_distribution.map((b) => b.count),
+        backgroundColor: analytics.probability_distribution.map((_, i) =>
+          i >= 5 ? "rgba(204,61,47,0.7)" : "rgba(15,123,140,0.6)"
+        ),
+      }],
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+
+  // 4. Scatter — Amount over Time
+  destroyChart("scatter");
+  const legitPts = analytics.time_series.filter((p) => p.fraud === 0).map((p) => ({ x: p.time, y: p.amount }));
+  const fraudPts = analytics.time_series.filter((p) => p.fraud === 1).map((p) => ({ x: p.time, y: p.amount }));
+  chartInstances["scatter"] = new Chart(document.getElementById("chartScatter"), {
+    type: "scatter",
+    data: {
+      datasets: [
+        { label: "Legit", data: legitPts, backgroundColor: "rgba(27,143,90,0.5)", pointRadius: 3 },
+        { label: "Fraud", data: fraudPts, backgroundColor: "rgba(204,61,47,0.8)", pointRadius: 4 },
+      ],
+    },
+    options: {
+      plugins: { legend: { position: "bottom" } },
+      scales: {
+        x: { title: { display: true, text: "Time (s)" } },
+        y: { title: { display: true, text: "Amount ($)" }, beginAtZero: true },
+      },
+    },
+  });
+
+  // 5. Top risks table
+  const topTable = document.getElementById("topRisksTable");
+  let html = "<thead><tr><th>Row</th><th>Amount</th><th>Fraud Probability</th></tr></thead><tbody>";
+  analytics.top_risks.forEach((r) => {
+    html += `<tr><td>#${r.row + 1}</td><td>$${r.amount.toFixed(2)}</td><td class="cell-fraud">${r.probability}%</td></tr>`;
+  });
+  html += "</tbody>";
+  topTable.innerHTML = html;
 }
 
 loadMetrics();
