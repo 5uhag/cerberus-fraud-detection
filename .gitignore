@@ -1,5 +1,4 @@
 venv/
 creditcard.csv
-metrics.json
 __pycache__/
 *.pyc
