@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cerberus Fraud Detection</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+<body>
+  <div class="background-glow"></div>
+  <main class="container">
+    <section class="hero">
+      <h1>Cerberus Fraud Detection Console</h1>
+      <p class="subtitle">Upload transaction CSV files and generate instant fraud risk scoring with a production-style report.</p>
+      <div class="about">
+        <h3>About Credit Card Fraud</h3>
+        <p>Credit card fraud includes unauthorized transactions made using stolen card details or card-not-present data. Common patterns include unusually large amounts, rapid sequence purchases, or abnormal geographic origins. This console scores each transaction on fraud likelihood so investigators can prioritize alerts.</p>
+      </div>
+      <div class="card-deck" aria-hidden="true">
+        <div class="card card-1">
+          <div class="chip"></div>
+          <div class="number">•••• •••• •••• 1234</div>
+          <div class="name">JOHN DOE</div>
+        </div>
+        <div class="card card-2">
+          <div class="chip"></div>
+          <div class="number">•••• •••• •••• 5678</div>
+          <div class="name">A. SMITH</div>
+        </div>
+        <div class="card card-3">
+          <div class="chip"></div>
+          <div class="number">•••• •••• •••• 9012</div>
+          <div class="name">M. LEE</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="metricsSection" class="panel hidden">
+      <div class="table-header">
+        <h2>Model Metrics</h2>
+        <p>Loaded from the latest training run</p>
+      </div>
+      <div class="summary-grid">
+        <article class="metric-card">
+          <p>Precision</p>
+          <h3 id="metricPrecision">—</h3>
+        </article>
+        <article class="metric-card">
+          <p>Recall</p>
+          <h3 id="metricRecall">—</h3>
+        </article>
+        <article class="metric-card">
+          <p>F1 Score</p>
+          <h3 id="metricF1">—</h3>
+        </article>
+        <article class="metric-card">
+          <p>Confusion Matrix</p>
+          <h3 id="metricConfusion" class="metric-text">—</h3>
+        </article>
+      </div>
+    </section>
+
+    {% if not assets_ready %}
+    <section class="alert error">
+      <h2>Model Artifacts Missing</h2>
+      <p>Run model.py first to generate fraud_model.pkl, data_scaler.pkl, and features_list.pkl.</p>
+    </section>
+    {% endif %}
+
+    <section class="panel">
+      <form id="uploadForm" enctype="multipart/form-data">
+        <div class="upload-box" id="uploadBox">
+          <input type="file" id="transactionsFile" name="transactions_file" accept=".csv" {% if not assets_ready %}disabled{% endif %} />
+          <p class="upload-title">Drop CSV here or click to browse</p>
+          <p class="upload-meta" id="fileLabel">Required columns: Time, Amount, V1 to V28</p>
+          <p class="upload-meta">Download sample files: <a href="{{ url_for('static', filename='samples/sample_transactions.csv') }}">sample_transactions.csv</a> · <a href="{{ url_for('static', filename='samples/sample_with_anomalies.csv') }}">sample_with_anomalies.csv</a></p>
+        </div>
+        <div class="actions">
+          <button type="submit" class="btn primary" {% if not assets_ready %}disabled{% endif %}>Analyze CSV</button>
+          <button type="button" id="downloadBtn" class="btn secondary" disabled>Download Predictions</button>
+          <div class="spacer"></div>
+          <div class="model-panel">
+            <h4>Model Details</h4>
+            {% if model_info.ready %}
+            <p><strong>Model:</strong> {{ model_info.model_name }}</p>
+            <p><strong>Features:</strong> {{ model_info.n_features }}</p>
+            <p><small>Trained with SMOTE-resampled data. Random Forest classifier.</small></p>
+            <div class="threshold-control">
+              <label for="threshold">Fraud threshold</label>
+              <input id="threshold" name="threshold" type="number" min="0" max="1" step="0.01" value="0.5" />
+              <small>Lower values catch more fraud; higher values reduce false positives.</small>
+            </div>
+            <div class="generate">
+              <label for="genRows">Generate sample:</label>
+              <input id="genRows" type="number" min="1" value="10" style="width:72px; margin-left:6px;" />
+              <button id="generateBtn" type="button" class="btn secondary">Download Generated CSV</button>
+            </div>
+            {% else %}
+            <p><em>Model artifacts not available. Run `model.py` to build artifacts.</em></p>
+            {% endif %}
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <section id="errorPanel" class="alert error hidden"></section>
+
+    <section id="summarySection" class="summary-grid hidden">
+      <article class="metric-card">
+        <p>Total Transactions</p>
+        <h3 id="totalTxn">0</h3>
+      </article>
+      <article class="metric-card danger">
+        <p>Fraud Transactions</p>
+        <h3 id="fraudTxn">0</h3>
+      </article>
+      <article class="metric-card safe">
+        <p>Legit Transactions</p>
+        <h3 id="legitTxn">0</h3>
+      </article>
+      <article class="metric-card">
+        <p>Fraud Rate</p>
+        <h3 id="fraudRate">0%</h3>
+      </article>
+    </section>
+
+    <section id="tableSection" class="panel hidden">
+      <div class="table-header">
+        <h2>Prediction Preview</h2>
+        <p>Showing first 15 rows from uploaded file</p>
+      </div>
+      <div class="table-wrap">
+        <table id="resultTable"></table>
+      </div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
