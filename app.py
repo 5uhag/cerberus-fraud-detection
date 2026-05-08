@@ -2,14 +2,43 @@ import io
 import json
 import logging
 import os
+from functools import wraps
 
 import joblib
 import numpy as np
 import pandas as pd
-from flask import Flask, jsonify, render_template, request, send_file
+from flask import Flask, jsonify, redirect, render_template, request, send_file, session, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-prod")
+
+USERS_PATH = "users.json"
+
+
+def load_users():
+    if not os.path.exists(USERS_PATH):
+        return {}
+    try:
+        with open(USERS_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_users(users):
+    with open(USERS_PATH, "w", encoding="utf-8") as f:
+        json.dump(users, f)
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "username" not in session:
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -182,6 +211,7 @@ def run_inference(uploaded_file, threshold=DEFAULT_THRESHOLD):
 
 
 @app.get("/")
+@login_required
 def index():
     assets_ready = MODEL is not None and SCALER is not None and FEATURE_ORDER is not None
     model_info = {"ready": assets_ready}
@@ -329,6 +359,54 @@ def download_results():
         download_name="fraud_predictions.csv",
         mimetype="text/csv",
     )
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if "username" in session:
+        return redirect(url_for("index"))
+
+    error = None
+    tab = "login"
+
+    if request.method == "POST":
+        action = request.form.get("action")
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        if action == "register":
+            tab = "register"
+            confirm = request.form.get("confirm_password", "")
+            if not username or not password:
+                error = "Username and password are required."
+            elif len(password) < 6:
+                error = "Password must be at least 6 characters."
+            elif password != confirm:
+                error = "Passwords do not match."
+            else:
+                users = load_users()
+                if username in users:
+                    error = "Username already taken."
+                else:
+                    users[username] = generate_password_hash(password)
+                    save_users(users)
+                    session["username"] = username
+                    return redirect(url_for("index"))
+        else:
+            users = load_users()
+            if username not in users or not check_password_hash(users[username], password):
+                error = "Invalid username or password."
+            else:
+                session["username"] = username
+                return redirect(url_for("index"))
+
+    return render_template("login.html", error=error, tab=tab)
+
+
+@app.get("/logout")
+def logout():
+    session.pop("username", None)
+    return redirect(url_for("login"))
 
 
 if __name__ == "__main__":

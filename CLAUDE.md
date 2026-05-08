@@ -49,11 +49,23 @@ After inference, `compute_analytics()` derives chart-ready data from the result:
 
 Single-page app — `templates/index.html` with `static/app.js` and `static/styles.css`. No framework. Chart instances are tracked in `chartInstances{}` and destroyed before re-render to avoid Chart.js duplicate canvas errors. The analytics section, summary grid, and table section are all hidden by default and revealed by JS after a successful `/predict` call.
 
+### Auth
+
+Session-based auth via Flask `session` + `werkzeug.security` (no extra packages). Users stored in `users.json` (gitignored) as `{ username: hashed_password }`. The `login_required` decorator in `app.py` guards protected routes. `SECRET_KEY` env var should be set on Render — falls back to a dev string locally (sessions won't survive restarts in prod without it).
+
+Things still TODO on auth:
+- No password reset / forgot password flow
+- No email verification
+- No account management (change password, delete account)
+- `users.json` is a flat file — fine for demo, would need a real DB for multi-user prod
+
 ### Routes
 
 | Method | Route | Purpose |
 |--------|-------|---------|
-| GET | `/` | Dashboard (Jinja checks `assets_ready`) |
+| GET | `/` | Dashboard — requires login |
+| GET/POST | `/login` | Login + sign-up page (tabs) |
+| GET | `/logout` | Clears session, redirects to `/login` |
 | POST | `/predict` | Returns summary + analytics + 15-row preview |
 | POST | `/download` | Returns full result CSV |
 | GET | `/metrics` | Reads `metrics.json`, returns model performance |
@@ -62,4 +74,4 @@ Single-page app — `templates/index.html` with `static/app.js` and `static/styl
 
 ## Data
 
-`creditcard.csv` is gitignored (100 MB+, not committed). The trained `.pkl` files are committed so Render can serve predictions without retraining. `metrics.json` is gitignored (generated artifact). Sample CSVs in `static/samples/` are committed and safe to use for testing — they include a `Class` column which the app ignores during inference.
+`creditcard.csv` is gitignored (100 MB+, not committed). The trained `.pkl` files are committed so Render can serve predictions without retraining. `metrics.json` is gitignored (generated artifact). `users.json` is gitignored (runtime auth data). Sample CSVs in `static/samples/` are committed and safe to use for testing — they include a `Class` column which the app ignores during inference.

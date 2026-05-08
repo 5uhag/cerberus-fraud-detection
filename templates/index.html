@@ -14,8 +14,14 @@
   <div class="background-glow"></div>
   <main class="container">
     <section class="hero">
-      <h1>Cerberus Fraud Detection Console</h1>
-      <p class="subtitle">Upload transaction CSV files and generate instant fraud risk scoring with a production-style report.</p>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+        <h1 style="margin:0;">Cerberus Fraud Detection Console</h1>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:0.88rem;color:var(--muted);">{{ session.username }}</span>
+          <a href="{{ url_for('logout') }}" style="font-size:0.88rem;font-weight:600;color:var(--primary);text-decoration:none;background:rgba(15,123,140,0.1);padding:6px 14px;border-radius:999px;">Sign out</a>
+        </div>
+      </div>
+      <p class="subtitle" style="margin-top:4px;">Upload transaction CSV files and generate instant fraud risk scoring with a production-style report.</p>
       <div class="about">
         <h3>About Credit Card Fraud</h3>
         <p>Credit card fraud includes unauthorized transactions made using stolen card details or card-not-present data. Common patterns include unusually large amounts, rapid sequence purchases, or abnormal geographic origins. This console scores each transaction on fraud likelihood so investigators can prioritize alerts.</p>

@@ -2,3 +2,4 @@ venv/
 creditcard.csv
 __pycache__/
 *.pyc
+users.json
